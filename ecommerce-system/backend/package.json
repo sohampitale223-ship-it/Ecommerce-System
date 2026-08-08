@@ -1,0 +1,20 @@
+{
+  "name": "shopease-backend",
+  "version": "1.0.0",
+  "description": "Backend API for the ShopEase E-commerce Management System",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mysql2": "^3.23.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
