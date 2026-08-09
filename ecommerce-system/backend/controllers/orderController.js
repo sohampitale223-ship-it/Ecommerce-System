@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { calculateDiscount, couponAvailabilityError, normalizeCouponCode } from '../services/couponOperations.js'
 
 const ORDER_STATUSES = ['Pending', 'Shipped', 'Delivered', 'Cancelled']
 const STATUS_TRANSITIONS = { Pending: 'Shipped', Shipped: 'Delivered' }
@@ -33,12 +34,14 @@ const normalizeItems = (items) => {
 
 const getOrder = async (executor, orderId) => {
   const [orders] = await executor.execute(
-    `SELECT o.order_id, o.user_id, o.total_amount, o.order_status, o.shipping_address,
+    `SELECT o.order_id, o.user_id, o.coupon_id, c.coupon_code, o.subtotal_amount,
+            o.discount_amount, o.total_amount, o.order_status, o.shipping_address,
             o.created_at, o.updated_at, o.status,
             CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
             u.email AS customer_email, u.phone AS customer_phone
      FROM orders o
      LEFT JOIN users u ON u.user_id = o.user_id
+     LEFT JOIN coupons c ON c.coupon_id = o.coupon_id
      WHERE o.order_id = ?`,
     [orderId],
   )
@@ -62,20 +65,23 @@ export const getOrders = async (req, res) => {
   }
 
   try {
-    let query = `SELECT o.order_id, o.user_id, o.total_amount, o.order_status,
+    let query = `SELECT o.order_id, o.user_id, o.coupon_id, c.coupon_code,
+                        o.subtotal_amount, o.discount_amount, o.total_amount, o.order_status,
                         o.shipping_address, o.created_at, o.updated_at, o.status,
                         CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
                         u.email AS customer_email,
                         COUNT(oi.order_item_id) AS item_count
                  FROM orders o
                  LEFT JOIN users u ON u.user_id = o.user_id
+                 LEFT JOIN coupons c ON c.coupon_id = o.coupon_id
                  LEFT JOIN order_items oi ON oi.order_id = o.order_id`
     const params = []
     if (requestedStatus) {
       query += ' WHERE o.order_status = ?'
       params.push(requestedStatus)
     }
-    query += ` GROUP BY o.order_id, o.user_id, o.total_amount, o.order_status,
+    query += ` GROUP BY o.order_id, o.user_id, o.coupon_id, c.coupon_code,
+                       o.subtotal_amount, o.discount_amount, o.total_amount, o.order_status,
                        o.shipping_address, o.created_at, o.updated_at, o.status,
                        u.first_name, u.last_name, u.email
                ORDER BY o.created_at DESC`
@@ -103,6 +109,7 @@ export const createOrder = async (req, res) => {
   const userId = req.body.user_id === undefined || req.body.user_id === null || req.body.user_id === ''
     ? null : validateId(req.body.user_id)
   const normalized = normalizeItems(req.body.items)
+  const couponCode = normalizeCouponCode(req.body.coupon_code)
 
   if (!shippingAddress) return res.status(400).json({ success: false, message: 'Shipping address is required.' })
   if (shippingAddress.length > 300) return res.status(400).json({ success: false, message: 'Shipping address cannot exceed 300 characters.' })
@@ -166,11 +173,20 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'The calculated order total is invalid or too large.' })
     }
 
-    const totalAmount = (totalCents / 100).toFixed(2)
+    let coupon = null
+    let totals = { subtotal_amount: (totalCents / 100).toFixed(2), discount_amount: '0.00', final_total: (totalCents / 100).toFixed(2) }
+    if (couponCode) {
+      const [coupons] = await connection.execute('SELECT * FROM coupons WHERE coupon_code = ? FOR UPDATE', [couponCode])
+      if (coupons.length === 0) { await connection.rollback(); return res.status(404).json({ success: false, message: 'Coupon not found.' }) }
+      coupon = coupons[0]
+      const issue = couponAvailabilityError(coupon)
+      if (issue) { await connection.rollback(); return res.status(issue.status).json({ success: false, message: issue.message }) }
+      totals = calculateDiscount(totalCents / 100, coupon)
+    }
     const [orderResult] = await connection.execute(
-      `INSERT INTO orders (user_id, total_amount, shipping_address)
-       VALUES (?, ?, ?)`,
-      [userId, totalAmount, shippingAddress],
+      `INSERT INTO orders (user_id, coupon_id, subtotal_amount, discount_amount, total_amount, shipping_address)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, coupon?.coupon_id || null, totals.subtotal_amount, totals.discount_amount, totals.final_total, shippingAddress],
     )
 
     for (const item of pricedItems) {
@@ -185,8 +201,10 @@ export const createOrder = async (req, res) => {
       )
     }
 
-    await connection.commit()
+    if (coupon) await connection.execute('UPDATE coupons SET used_count = used_count + 1 WHERE coupon_id = ?', [coupon.coupon_id])
+
     const order = await getOrder(connection, orderResult.insertId)
+    await connection.commit()
     return res.status(201).json({ success: true, message: 'Order created successfully', data: order })
   } catch (error) {
     await connection.rollback()

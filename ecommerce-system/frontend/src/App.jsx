@@ -12,6 +12,7 @@ import CartDashboard from './pages/carts/CartDashboard'
 import WishlistDashboard from './pages/wishlists/WishlistDashboard'
 import ShippingDashboard from './pages/shipping/ShippingDashboard'
 import ReviewDashboard from './pages/reviews/ReviewDashboard'
+import CouponDashboard from './pages/coupons/CouponDashboard'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="/wishlists" element={<WishlistDashboard />} />
           <Route path="/shipping" element={<ShippingDashboard />} />
           <Route path="/reviews" element={<ReviewDashboard />} />
+          <Route path="/coupons" element={<CouponDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

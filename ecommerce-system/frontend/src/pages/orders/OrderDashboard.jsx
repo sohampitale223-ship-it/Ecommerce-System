@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getProducts } from '../../services/productService'
 import { getCustomers } from '../../services/customerService'
+import { validateCoupon } from '../../services/couponService'
 import {
   cancelOrder,
   createOrder,
@@ -25,6 +26,8 @@ function OrderFormModal({ products, customers, onClose, onCreated }) {
   const [items, setItems] = useState([{ product_id: '', quantity: 1 }])
   const [userId, setUserId] = useState('')
   const [shippingAddress, setShippingAddress] = useState('')
+  const [couponCode, setCouponCode] = useState('')
+  const [couponPreview, setCouponPreview] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -32,10 +35,13 @@ function OrderFormModal({ products, customers, onClose, onCreated }) {
     const product = products.find((entry) => entry.product_id === Number(item.product_id))
     return sum + (product ? Number(product.price) * Number(item.quantity || 0) : 0)
   }, 0), [items, products])
-
-  const updateItem = (index, field, value) => setItems((current) => current.map((item, itemIndex) => (
+  const updateItem = (index, field, value) => { setCouponPreview(null); setItems((current) => current.map((item, itemIndex) => (
     itemIndex === index ? { ...item, [field]: value } : item
-  )))
+  ))) }
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return setError('Enter a coupon code.')
+    try { const response = await validateCoupon(couponCode, total); setCouponPreview(response.data.data); setError('') } catch (requestError) { setCouponPreview(null); setError(getErrorMessage(requestError)) }
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -51,6 +57,7 @@ function OrderFormModal({ products, customers, onClose, onCreated }) {
     try {
       const response = await createOrder({
         user_id: userId ? Number(userId) : null,
+        coupon_code: couponPreview ? couponPreview.coupon_code : '',
         shipping_address: address,
         items: items.map((item) => ({ product_id: Number(item.product_id), quantity: Number(item.quantity) })),
       })
@@ -77,12 +84,13 @@ function OrderFormModal({ products, customers, onClose, onCreated }) {
                   <option value="">Select a product</option>{products.map((product) => <option key={product.product_id} value={product.product_id}>{product.product_name} ({product.SKU}) — {formatMoney(product.price)} — {product.inventory_count} in stock</option>)}
                 </select></div>
               <div className="col-8 col-md-3"><label className="form-label" htmlFor={`orderQuantity${index}`}>Quantity *</label><input className="form-control" id={`orderQuantity${index}`} type="number" min="1" max={selected?.inventory_count} step="1" value={item.quantity} onChange={(event) => updateItem(index, 'quantity', event.target.value)} required /></div>
-              <div className="col-4 col-md-2"><button type="button" className="btn btn-outline-danger w-100" disabled={items.length === 1} onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></div>
+              <div className="col-4 col-md-2"><button type="button" className="btn btn-outline-danger w-100" disabled={items.length === 1} onClick={() => { setCouponPreview(null); setItems((current) => current.filter((_, itemIndex) => itemIndex !== index)) }}>Remove</button></div>
             </div>
           })}
-          <button type="button" className="btn btn-sm btn-outline-primary mb-4" onClick={() => setItems((current) => [...current, { product_id: '', quantity: 1 }])}>+ Add Item</button>
+          <button type="button" className="btn btn-sm btn-outline-primary mb-4" onClick={() => { setCouponPreview(null); setItems((current) => [...current, { product_id: '', quantity: 1 }]) }}>+ Add Item</button>
+          <div className="mb-3"><label className="form-label" htmlFor="couponCode">Coupon</label><div className="input-group"><input id="couponCode" className="form-control text-uppercase" maxLength="50" value={couponCode} onChange={(event) => { setCouponCode(event.target.value); setCouponPreview(null) }} placeholder="Enter coupon code" /><button type="button" className="btn btn-outline-primary" onClick={applyCoupon} disabled={!couponCode.trim() || total < 0}>Apply</button></div>{couponPreview && <div className="form-text text-success">{couponPreview.coupon_code} applied. The backend will revalidate it during order creation.</div>}</div>
           <div className="mb-3"><label className="form-label" htmlFor="shippingAddress">Shipping Address *</label><textarea className="form-control" id="shippingAddress" rows="3" maxLength="300" value={shippingAddress} onChange={(event) => setShippingAddress(event.target.value)} required /><div className="form-text text-end">{shippingAddress.length}/300</div></div>
-          <div className="text-end fs-5"><span className="text-secondary">Estimated total: </span><strong>{formatMoney(total)}</strong></div>
+          <div className="text-end"><div><span className="text-secondary">Subtotal: </span>{formatMoney(total)}</div>{couponPreview && <><div><span className="text-secondary">Coupon: </span>{couponPreview.coupon_code}</div><div className="text-success"><span>Discount: </span>-{formatMoney(couponPreview.discount_amount)}</div></>}<div className="fs-5"><span className="text-secondary">Final total: </span><strong>{formatMoney(couponPreview?.final_total ?? total)}</strong></div></div>
         </div>
         <div className="modal-footer"><button type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={saving}>Close</button><button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Creating...' : 'Place Order'}</button></div>
       </form>
@@ -98,7 +106,7 @@ function OrderDetailsModal({ orderId, onClose }) {
     <div className="modal-header"><h2 className="modal-title fs-5" id="orderDetailsTitle">Order #{orderId}</h2><button type="button" className="btn-close" onClick={onClose} aria-label="Close" /></div>
     <div className="modal-body">{error ? <div className="alert alert-danger">{error}</div> : !order ? <p className="text-secondary text-center py-4">Loading order...</p> : <>
       <div className="row g-3 mb-4"><div className="col-md-3"><span className="text-secondary d-block">Status</span><span className={`badge ${badgeClasses[order.order_status]}`}>{order.order_status}</span></div><div className="col-md-3"><span className="text-secondary d-block">User ID</span>{order.user_id || '—'}</div><div className="col-md-6"><span className="text-secondary d-block">Customer</span>{order.user_id ? <>{order.customer_name}<span className="text-secondary d-block small">{order.customer_email} · {order.customer_phone}</span></> : 'Guest'}</div><div className="col-12"><span className="text-secondary d-block">Shipping Address</span>{order.shipping_address}</div></div>
-      <div className="table-responsive"><table className="table align-middle"><thead><tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Unit Price</th><th>Subtotal</th></tr></thead><tbody>{order.items.map((item) => <tr key={item.order_item_id}><td>{item.product_name}</td><td>{item.SKU}</td><td>{item.quantity}</td><td>{formatMoney(item.unit_price)}</td><td>{formatMoney(item.subtotal)}</td></tr>)}</tbody><tfoot><tr><th colSpan="4" className="text-end">Total</th><th>{formatMoney(order.total_amount)}</th></tr></tfoot></table></div>
+      <div className="table-responsive"><table className="table align-middle"><thead><tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Unit Price</th><th>Subtotal</th></tr></thead><tbody>{order.items.map((item) => <tr key={item.order_item_id}><td>{item.product_name}</td><td>{item.SKU}</td><td>{item.quantity}</td><td>{formatMoney(item.unit_price)}</td><td>{formatMoney(item.subtotal)}</td></tr>)}</tbody><tfoot><tr><th colSpan="4" className="text-end">Subtotal</th><th>{formatMoney(order.subtotal_amount)}</th></tr>{order.coupon_id && <><tr><th colSpan="4" className="text-end">Coupon ({order.coupon_code})</th><th className="text-success">-{formatMoney(order.discount_amount)}</th></tr></>}<tr><th colSpan="4" className="text-end">Final Total</th><th>{formatMoney(order.total_amount)}</th></tr></tfoot></table></div>
     </>}</div><div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Close</button></div>
   </div></div></div><div className="modal-backdrop show" /></div>
 }

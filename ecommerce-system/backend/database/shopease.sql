@@ -53,9 +53,30 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT chk_user_phone_not_blank CHECK (CHAR_LENGTH(TRIM(phone)) > 0)
 );
 
+CREATE TABLE IF NOT EXISTS coupons (
+    coupon_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    coupon_code VARCHAR(50) NOT NULL UNIQUE,
+    discount_type ENUM('Percentage', 'Fixed') NOT NULL,
+    discount_value DECIMAL(10,2) NOT NULL,
+    valid_from DATETIME NOT NULL,
+    valid_to DATETIME NOT NULL,
+    usage_limit INT UNSIGNED NOT NULL,
+    used_count INT UNSIGNED NOT NULL DEFAULT 0,
+    status BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_coupons_status_dates (status, valid_from, valid_to),
+    CONSTRAINT chk_coupon_value CHECK (discount_value > 0 AND (discount_type <> 'Percentage' OR discount_value <= 100)),
+    CONSTRAINT chk_coupon_dates CHECK (valid_to > valid_from),
+    CONSTRAINT chk_coupon_usage CHECK (usage_limit > 0 AND used_count <= usage_limit)
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     order_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     user_id INT NULL,
+    coupon_id INT UNSIGNED NULL,
+    subtotal_amount DECIMAL(10,2) NOT NULL,
+    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
     total_amount DECIMAL(10,2) NOT NULL,
     order_status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     shipping_address VARCHAR(300) NOT NULL,
@@ -63,8 +84,11 @@ CREATE TABLE IF NOT EXISTS orders (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     status BOOLEAN NOT NULL DEFAULT TRUE,
     INDEX idx_orders_user_id (user_id),
+    INDEX idx_orders_coupon_id (coupon_id),
     INDEX idx_orders_status_created (order_status, created_at),
     CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT fk_orders_coupon FOREIGN KEY (coupon_id) REFERENCES coupons(coupon_id)
         ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT chk_order_total_nonnegative CHECK (total_amount >= 0),
     CONSTRAINT chk_order_status CHECK (order_status IN ('Pending', 'Shipped', 'Delivered', 'Cancelled')),
