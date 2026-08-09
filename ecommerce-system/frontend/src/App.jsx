@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import CategoryDashboard from './pages/categories/CategoryDashboard'
 import ProductDashboard from './pages/products/ProductDashboard'
+import OrderDashboard from './pages/orders/OrderDashboard'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/categories" element={<CategoryDashboard />} />
           <Route path="/products" element={<ProductDashboard />} />
+          <Route path="/orders" element={<OrderDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

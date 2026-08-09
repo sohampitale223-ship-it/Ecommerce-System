@@ -6,6 +6,7 @@ dotenv.config()
 
 const { default: categoryRoutes } = await import('./routes/categoryRoutes.js')
 const { default: productRoutes } = await import('./routes/productRoutes.js')
+const { default: orderRoutes } = await import('./routes/orderRoutes.js')
 const { testDatabaseConnection } = await import('./config/db.js')
 
 const app = express()
@@ -15,6 +16,7 @@ app.use(cors())
 app.use(express.json())
 app.use('/api/categories', categoryRoutes)
 app.use('/api/products', productRoutes)
+app.use('/api/orders', orderRoutes)
 
 app.get('/', (req, res) => {
   res.json({
