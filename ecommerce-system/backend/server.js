@@ -5,6 +5,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 const { default: categoryRoutes } = await import('./routes/categoryRoutes.js')
+const { default: productRoutes } = await import('./routes/productRoutes.js')
 const { testDatabaseConnection } = await import('./config/db.js')
 
 const app = express()
@@ -13,6 +14,7 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 app.use('/api/categories', categoryRoutes)
+app.use('/api/products', productRoutes)
 
 app.get('/', (req, res) => {
   res.json({

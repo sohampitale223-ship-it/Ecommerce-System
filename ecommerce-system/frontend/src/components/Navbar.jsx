@@ -24,6 +24,7 @@ function Navbar() {
           <div className="navbar-nav ms-auto">
             <NavLink className={linkClass} to="/">Home</NavLink>
             <NavLink className={linkClass} to="/categories">Categories</NavLink>
+            <NavLink className={linkClass} to="/products">Products</NavLink>
             <NavLink className={linkClass} to="/login">Login</NavLink>
             <NavLink className={linkClass} to="/register">Register</NavLink>
           </div>

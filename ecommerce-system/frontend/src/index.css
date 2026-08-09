@@ -36,6 +36,16 @@ body {
   white-space: normal;
 }
 
+.product-description {
+  min-width: 220px;
+  max-width: 360px;
+  white-space: normal;
+}
+
+.product-table th {
+  white-space: nowrap;
+}
+
 .modal-backdrop-wrapper .modal {
   z-index: 1060;
 }

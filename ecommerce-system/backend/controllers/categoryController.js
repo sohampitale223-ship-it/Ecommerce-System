@@ -29,8 +29,13 @@ const activeDuplicateExists = async (categoryName, excludedId = null) => {
   return rows.length > 0
 }
 
-// Products are not implemented yet. Replace this with a COUNT query when that module is added.
-const getProductCount = async () => 0
+const getProductCount = async (categoryId) => {
+  const [rows] = await pool.execute(
+    'SELECT COUNT(*) AS product_count FROM products WHERE category_id = ? AND status = TRUE',
+    [categoryId],
+  )
+  return Number(rows[0].product_count)
+}
 
 const sendDatabaseError = (res, error) => {
   console.error('Category database operation failed:', error.message)
@@ -43,10 +48,12 @@ const sendDatabaseError = (res, error) => {
 export const getCategories = async (req, res) => {
   try {
     const [categories] = await pool.execute(`
-      SELECT category_id, category_name, description, created_at, updated_at, status,
-             0 AS product_count
-      FROM categories
-      ORDER BY created_at DESC
+      SELECT c.category_id, c.category_name, c.description, c.created_at, c.updated_at, c.status,
+             COUNT(p.product_id) AS product_count
+      FROM categories c
+      LEFT JOIN products p ON p.category_id = c.category_id AND p.status = TRUE
+      GROUP BY c.category_id, c.category_name, c.description, c.created_at, c.updated_at, c.status
+      ORDER BY c.created_at DESC
     `)
     return res.json({ success: true, data: categories })
   } catch (error) {
@@ -60,9 +67,12 @@ export const getCategoryById = async (req, res) => {
 
   try {
     const [rows] = await pool.execute(`
-      SELECT category_id, category_name, description, created_at, updated_at, status,
-             0 AS product_count
-      FROM categories WHERE category_id = ?
+      SELECT c.category_id, c.category_name, c.description, c.created_at, c.updated_at, c.status,
+             COUNT(p.product_id) AS product_count
+      FROM categories c
+      LEFT JOIN products p ON p.category_id = c.category_id AND p.status = TRUE
+      WHERE c.category_id = ?
+      GROUP BY c.category_id, c.category_name, c.description, c.created_at, c.updated_at, c.status
     `, [id])
 
     if (rows.length === 0) {
