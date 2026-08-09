@@ -9,6 +9,7 @@ const { default: productRoutes } = await import('./routes/productRoutes.js')
 const { default: orderRoutes } = await import('./routes/orderRoutes.js')
 const { default: customerRoutes } = await import('./routes/customerRoutes.js')
 const { default: paymentRoutes } = await import('./routes/paymentRoutes.js')
+const { default: cartRoutes } = await import('./routes/cartRoutes.js')
 const { testDatabaseConnection } = await import('./config/db.js')
 
 const app = express()
@@ -21,6 +22,7 @@ app.use('/api/products', productRoutes)
 app.use('/api/orders', orderRoutes)
 app.use('/api/customers', customerRoutes)
 app.use('/api/payments', paymentRoutes)
+app.use('/api/carts', cartRoutes)
 
 app.get('/', (req, res) => {
   res.json({
