@@ -11,6 +11,7 @@ import PaymentDashboard from './pages/payments/PaymentDashboard'
 import CartDashboard from './pages/carts/CartDashboard'
 import WishlistDashboard from './pages/wishlists/WishlistDashboard'
 import ShippingDashboard from './pages/shipping/ShippingDashboard'
+import ReviewDashboard from './pages/reviews/ReviewDashboard'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           <Route path="/carts" element={<CartDashboard />} />
           <Route path="/wishlists" element={<WishlistDashboard />} />
           <Route path="/shipping" element={<ShippingDashboard />} />
+          <Route path="/reviews" element={<ReviewDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getProducts } from '../../services/productService'
+import { getCustomers } from '../../services/customerService'
 import {
   cancelOrder,
   createOrder,
@@ -20,8 +21,9 @@ const formatDate = (value) => value
   ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
   : '—'
 
-function OrderFormModal({ products, onClose, onCreated }) {
+function OrderFormModal({ products, customers, onClose, onCreated }) {
   const [items, setItems] = useState([{ product_id: '', quantity: 1 }])
+  const [userId, setUserId] = useState('')
   const [shippingAddress, setShippingAddress] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -48,6 +50,7 @@ function OrderFormModal({ products, onClose, onCreated }) {
     setError('')
     try {
       const response = await createOrder({
+        user_id: userId ? Number(userId) : null,
         shipping_address: address,
         items: items.map((item) => ({ product_id: Number(item.product_id), quantity: Number(item.quantity) })),
       })
@@ -65,6 +68,7 @@ function OrderFormModal({ products, onClose, onCreated }) {
         <div className="modal-body">
           {error && <div className="alert alert-danger" role="alert">{error}</div>}
           <p className="text-secondary small">Prices and stock are revalidated by the server when the order is submitted.</p>
+          <div className="mb-3"><label className="form-label" htmlFor="orderCustomer">Customer</label><select className="form-select" id="orderCustomer" value={userId} onChange={(event) => setUserId(event.target.value)}><option value="">Guest</option>{customers.map((customer) => <option key={customer.user_id} value={customer.user_id}>{customer.full_name} — {customer.email}</option>)}</select></div>
           {items.map((item, index) => {
             const selected = products.find((product) => product.product_id === Number(item.product_id))
             return <div className="row g-2 align-items-end mb-3" key={index}>
@@ -93,7 +97,7 @@ function OrderDetailsModal({ orderId, onClose }) {
   return <div className="modal-backdrop-wrapper" role="dialog" aria-modal="true" aria-labelledby="orderDetailsTitle"><div className="modal d-block" tabIndex="-1"><div className="modal-dialog modal-lg modal-dialog-centered"><div className="modal-content">
     <div className="modal-header"><h2 className="modal-title fs-5" id="orderDetailsTitle">Order #{orderId}</h2><button type="button" className="btn-close" onClick={onClose} aria-label="Close" /></div>
     <div className="modal-body">{error ? <div className="alert alert-danger">{error}</div> : !order ? <p className="text-secondary text-center py-4">Loading order...</p> : <>
-      <div className="row g-3 mb-4"><div className="col-md-4"><span className="text-secondary d-block">Status</span><span className={`badge ${badgeClasses[order.order_status]}`}>{order.order_status}</span></div><div className="col-md-8"><span className="text-secondary d-block">Shipping Address</span>{order.shipping_address}</div></div>
+      <div className="row g-3 mb-4"><div className="col-md-3"><span className="text-secondary d-block">Status</span><span className={`badge ${badgeClasses[order.order_status]}`}>{order.order_status}</span></div><div className="col-md-3"><span className="text-secondary d-block">User ID</span>{order.user_id || '—'}</div><div className="col-md-6"><span className="text-secondary d-block">Customer</span>{order.user_id ? <>{order.customer_name}<span className="text-secondary d-block small">{order.customer_email} · {order.customer_phone}</span></> : 'Guest'}</div><div className="col-12"><span className="text-secondary d-block">Shipping Address</span>{order.shipping_address}</div></div>
       <div className="table-responsive"><table className="table align-middle"><thead><tr><th>Product</th><th>SKU</th><th>Quantity</th><th>Unit Price</th><th>Subtotal</th></tr></thead><tbody>{order.items.map((item) => <tr key={item.order_item_id}><td>{item.product_name}</td><td>{item.SKU}</td><td>{item.quantity}</td><td>{formatMoney(item.unit_price)}</td><td>{formatMoney(item.subtotal)}</td></tr>)}</tbody><tfoot><tr><th colSpan="4" className="text-end">Total</th><th>{formatMoney(order.total_amount)}</th></tr></tfoot></table></div>
     </>}</div><div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Close</button></div>
   </div></div></div><div className="modal-backdrop show" /></div>
@@ -120,6 +124,7 @@ function ConfirmModal({ order, action, onClose, onConfirmed }) {
 function OrderDashboard() {
   const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
+  const [customers, setCustomers] = useState([])
   const [filter, setFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -140,14 +145,15 @@ function OrderDashboard() {
       .finally(() => setLoading(false))
   }, [filter])
   useEffect(() => { getProducts().then((response) => setProducts(response.data.data.filter((product) => Boolean(product.status) && Number(product.inventory_count) > 0))).catch(() => {}) }, [])
+  useEffect(() => { getCustomers().then((response) => setCustomers(response.data.data.filter((customer) => Boolean(customer.status)))).catch(() => {}) }, [])
   const completed = async (message) => { setShowForm(false); setConfirmation(null); setSuccess(message); await loadOrders(); getProducts().then((response) => setProducts(response.data.data.filter((product) => Boolean(product.status) && Number(product.inventory_count) > 0))).catch(() => {}) }
 
   return <section className="container-fluid px-3 px-lg-5 py-4 py-lg-5">
     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4"><div><h1 className="h2 mb-1">Order Management</h1><p className="text-secondary mb-0">Create orders, track fulfillment, and manage cancellations.</p></div><button className="btn btn-primary align-self-start" disabled={products.length === 0} onClick={() => { setShowForm(true); setSuccess('') }}>+ Place Order</button></div>
     {success && <div className="alert alert-success alert-dismissible">{success}<button className="btn-close" onClick={() => setSuccess('')} aria-label="Close" /></div>}{error && <div className="alert alert-danger">{error}</div>}{!loading && products.length === 0 && <div className="alert alert-warning">No active products with available inventory can be ordered.</div>}
     <div className="d-flex flex-wrap gap-2 mb-3" aria-label="Filter orders">{statuses.map((status) => <button key={status || 'All'} className={`btn btn-sm ${filter === status ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setFilter(status)}>{status || 'All'}</button>)}</div>
-    <div className="card border-0 shadow-sm"><div className="card-body p-0">{loading ? <p className="text-center text-secondary p-5 mb-0">Loading orders...</p> : orders.length === 0 && !error ? <p className="text-center text-secondary p-5 mb-0">No {filter.toLowerCase()} orders found.</p> : <div className="table-responsive"><table className="table table-hover align-middle mb-0 order-table"><thead className="table-light"><tr><th>ID</th><th>User ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Shipping Address</th><th>Status</th><th>Created At</th><th>Updated At</th><th>Actions</th></tr></thead><tbody>{orders.map((order) => <tr key={order.order_id}><td>{order.order_id}</td><td>{order.user_id || '—'}</td><td className="text-secondary">Guest</td><td>{order.item_count}</td><td className="text-nowrap">{formatMoney(order.total_amount)}</td><td className="order-address">{order.shipping_address}</td><td><span className={`badge ${badgeClasses[order.order_status]}`}>{order.order_status}</span></td><td className="text-nowrap">{formatDate(order.created_at)}</td><td className="text-nowrap">{formatDate(order.updated_at)}</td><td><div className="d-flex flex-wrap gap-2"><button className="btn btn-sm btn-outline-secondary" onClick={() => setDetailsId(order.order_id)}>View</button>{nextStatuses[order.order_status] && <button className="btn btn-sm btn-outline-primary" onClick={() => setConfirmation({ order, action: 'status' })}>Mark {nextStatuses[order.order_status]}</button>}{order.order_status === 'Pending' && <button className="btn btn-sm btn-outline-danger" onClick={() => setConfirmation({ order, action: 'cancel' })}>Cancel</button>}</div></td></tr>)}</tbody></table></div>}</div></div>
-    {showForm && <OrderFormModal products={products} onClose={() => setShowForm(false)} onCreated={completed} />}{detailsId && <OrderDetailsModal orderId={detailsId} onClose={() => setDetailsId(null)} />}{confirmation && <ConfirmModal {...confirmation} onClose={() => setConfirmation(null)} onConfirmed={completed} />}
+    <div className="card border-0 shadow-sm"><div className="card-body p-0">{loading ? <p className="text-center text-secondary p-5 mb-0">Loading orders...</p> : orders.length === 0 && !error ? <p className="text-center text-secondary p-5 mb-0">No {filter.toLowerCase()} orders found.</p> : <div className="table-responsive"><table className="table table-hover align-middle mb-0 order-table"><thead className="table-light"><tr><th>ID</th><th>User ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Shipping Address</th><th>Status</th><th>Created At</th><th>Updated At</th><th>Actions</th></tr></thead><tbody>{orders.map((order) => <tr key={order.order_id}><td>{order.order_id}</td><td>{order.user_id || '—'}</td><td className="text-secondary">{order.customer_name || 'Guest'}</td><td>{order.item_count}</td><td className="text-nowrap">{formatMoney(order.total_amount)}</td><td className="order-address">{order.shipping_address}</td><td><span className={`badge ${badgeClasses[order.order_status]}`}>{order.order_status}</span></td><td className="text-nowrap">{formatDate(order.created_at)}</td><td className="text-nowrap">{formatDate(order.updated_at)}</td><td><div className="d-flex flex-wrap gap-2"><button className="btn btn-sm btn-outline-secondary" onClick={() => setDetailsId(order.order_id)}>View</button>{nextStatuses[order.order_status] && <button className="btn btn-sm btn-outline-primary" onClick={() => setConfirmation({ order, action: 'status' })}>Mark {nextStatuses[order.order_status]}</button>}{order.order_status === 'Pending' && <button className="btn btn-sm btn-outline-danger" onClick={() => setConfirmation({ order, action: 'cancel' })}>Cancel</button>}</div></td></tr>)}</tbody></table></div>}</div></div>
+    {showForm && <OrderFormModal products={products} customers={customers} onClose={() => setShowForm(false)} onCreated={completed} />}{detailsId && <OrderDetailsModal orderId={detailsId} onClose={() => setDetailsId(null)} />}{confirmation && <ConfirmModal {...confirmation} onClose={() => setConfirmation(null)} onConfirmed={completed} />}
   </section>
 }
 

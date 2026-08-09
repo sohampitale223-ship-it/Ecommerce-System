@@ -33,9 +33,13 @@ const normalizeItems = (items) => {
 
 const getOrder = async (executor, orderId) => {
   const [orders] = await executor.execute(
-    `SELECT order_id, user_id, total_amount, order_status, shipping_address,
-            created_at, updated_at, status
-     FROM orders WHERE order_id = ?`,
+    `SELECT o.order_id, o.user_id, o.total_amount, o.order_status, o.shipping_address,
+            o.created_at, o.updated_at, o.status,
+            CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
+            u.email AS customer_email, u.phone AS customer_phone
+     FROM orders o
+     LEFT JOIN users u ON u.user_id = o.user_id
+     WHERE o.order_id = ?`,
     [orderId],
   )
   if (orders.length === 0) return null
@@ -60,8 +64,11 @@ export const getOrders = async (req, res) => {
   try {
     let query = `SELECT o.order_id, o.user_id, o.total_amount, o.order_status,
                         o.shipping_address, o.created_at, o.updated_at, o.status,
+                        CONCAT(u.first_name, ' ', u.last_name) AS customer_name,
+                        u.email AS customer_email,
                         COUNT(oi.order_item_id) AS item_count
                  FROM orders o
+                 LEFT JOIN users u ON u.user_id = o.user_id
                  LEFT JOIN order_items oi ON oi.order_id = o.order_id`
     const params = []
     if (requestedStatus) {
@@ -69,7 +76,8 @@ export const getOrders = async (req, res) => {
       params.push(requestedStatus)
     }
     query += ` GROUP BY o.order_id, o.user_id, o.total_amount, o.order_status,
-                       o.shipping_address, o.created_at, o.updated_at, o.status
+                       o.shipping_address, o.created_at, o.updated_at, o.status,
+                       u.first_name, u.last_name, u.email
                ORDER BY o.created_at DESC`
     const [orders] = await pool.execute(query, params)
     return res.json({ success: true, data: orders })
@@ -108,6 +116,22 @@ export const createOrder = async (req, res) => {
 
   try {
     await connection.beginTransaction()
+
+    if (userId !== null) {
+      const [customers] = await connection.execute(
+        'SELECT user_id, status FROM users WHERE user_id = ? FOR UPDATE',
+        [userId],
+      )
+      if (customers.length === 0) {
+        await connection.rollback()
+        return res.status(404).json({ success: false, message: 'Customer not found.' })
+      }
+      if (!customers[0].status) {
+        await connection.rollback()
+        return res.status(409).json({ success: false, message: 'Inactive customers cannot place orders.' })
+      }
+    }
+
     const pricedItems = []
     let totalCents = 0
 

@@ -70,6 +70,16 @@ body {
   white-space: nowrap;
 }
 
+.review-table th {
+  white-space: nowrap;
+}
+
+.review-text {
+  min-width: 240px;
+  max-width: 420px;
+  white-space: normal;
+}
+
 .order-address {
   min-width: 220px;
   max-width: 360px;

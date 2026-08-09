@@ -168,3 +168,24 @@ CREATE TABLE IF NOT EXISTS shipping (
     CONSTRAINT chk_shipping_status CHECK (shipping_status IN ('Pending', 'Shipped', 'In Transit', 'Delivered')),
     CONSTRAINT chk_courier_service_not_blank CHECK (CHAR_LENGTH(TRIM(courier_service)) > 0)
 );
+
+CREATE TABLE IF NOT EXISTS reviews (
+    review_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    product_id INT UNSIGNED NOT NULL,
+    customer_id INT NOT NULL,
+    rating INT NOT NULL,
+    review_text VARCHAR(1000) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    status BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT uq_reviews_customer_product UNIQUE (customer_id, product_id),
+    INDEX idx_reviews_product_id (product_id),
+    INDEX idx_reviews_customer_id (customer_id),
+    INDEX idx_reviews_status (status),
+    CONSTRAINT fk_reviews_product FOREIGN KEY (product_id) REFERENCES products(product_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT fk_reviews_customer FOREIGN KEY (customer_id) REFERENCES users(user_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT chk_review_rating CHECK (rating BETWEEN 1 AND 5),
+    CONSTRAINT chk_review_text_not_blank CHECK (CHAR_LENGTH(TRIM(review_text)) > 0)
+);

@@ -12,6 +12,7 @@ const { default: paymentRoutes } = await import('./routes/paymentRoutes.js')
 const { default: cartRoutes } = await import('./routes/cartRoutes.js')
 const { default: wishlistRoutes } = await import('./routes/wishlistRoutes.js')
 const { default: shippingRoutes } = await import('./routes/shippingRoutes.js')
+const { default: reviewRoutes } = await import('./routes/reviewRoutes.js')
 const { testDatabaseConnection } = await import('./config/db.js')
 
 const app = express()
@@ -27,6 +28,7 @@ app.use('/api/payments', paymentRoutes)
 app.use('/api/carts', cartRoutes)
 app.use('/api/wishlists', wishlistRoutes)
 app.use('/api/shipping', shippingRoutes)
+app.use('/api/reviews', reviewRoutes)
 
 app.get('/', (req, res) => {
   res.json({
