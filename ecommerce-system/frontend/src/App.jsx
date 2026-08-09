@@ -10,6 +10,7 @@ import CustomerDashboard from './pages/customers/CustomerDashboard'
 import PaymentDashboard from './pages/payments/PaymentDashboard'
 import CartDashboard from './pages/carts/CartDashboard'
 import WishlistDashboard from './pages/wishlists/WishlistDashboard'
+import ShippingDashboard from './pages/shipping/ShippingDashboard'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/payments" element={<PaymentDashboard />} />
           <Route path="/carts" element={<CartDashboard />} />
           <Route path="/wishlists" element={<WishlistDashboard />} />
+          <Route path="/shipping" element={<ShippingDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

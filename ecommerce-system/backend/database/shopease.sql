@@ -149,3 +149,22 @@ CREATE TABLE IF NOT EXISTS wishlists (
     CONSTRAINT fk_wishlists_product FOREIGN KEY (product_id) REFERENCES products(product_id)
         ON UPDATE RESTRICT ON DELETE RESTRICT
 );
+
+CREATE TABLE IF NOT EXISTS shipping (
+    shipping_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    order_id INT UNSIGNED NOT NULL,
+    courier_service VARCHAR(100) NOT NULL,
+    tracking_number VARCHAR(100) NULL,
+    shipping_status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+    shipping_cost DECIMAL(10,2) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_shipping_order UNIQUE (order_id),
+    CONSTRAINT uq_shipping_tracking UNIQUE (tracking_number),
+    INDEX idx_shipping_status (shipping_status),
+    CONSTRAINT fk_shipping_order FOREIGN KEY (order_id) REFERENCES orders(order_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT chk_shipping_cost_nonnegative CHECK (shipping_cost >= 0),
+    CONSTRAINT chk_shipping_status CHECK (shipping_status IN ('Pending', 'Shipped', 'In Transit', 'Delivered')),
+    CONSTRAINT chk_courier_service_not_blank CHECK (CHAR_LENGTH(TRIM(courier_service)) > 0)
+);
