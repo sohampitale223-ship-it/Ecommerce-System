@@ -134,3 +134,18 @@ CREATE TABLE IF NOT EXISTS carts (
     CONSTRAINT chk_cart_quantity_positive CHECK (quantity > 0),
     CONSTRAINT chk_cart_total_nonnegative CHECK (total_price >= 0)
 );
+
+CREATE TABLE IF NOT EXISTS wishlists (
+    wishlist_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    customer_id INT NOT NULL,
+    product_id INT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_wishlists_customer_id (customer_id),
+    INDEX idx_wishlists_product_id (product_id),
+    CONSTRAINT uq_wishlists_customer_product UNIQUE (customer_id, product_id),
+    CONSTRAINT fk_wishlists_customer FOREIGN KEY (customer_id) REFERENCES users(user_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT fk_wishlists_product FOREIGN KEY (product_id) REFERENCES products(product_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT
+);

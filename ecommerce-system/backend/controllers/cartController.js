@@ -1,4 +1,5 @@
 import pool from '../config/db.js'
+import { addProductToCart, CartOperationError } from '../services/cartOperations.js'
 
 const validateId = (value) => {
   const id = Number(value)
@@ -76,36 +77,16 @@ export const addToCart = async (req, res) => {
   try {
     connection = await pool.getConnection()
     await connection.beginTransaction()
-    const [customers] = await connection.execute('SELECT user_id, status FROM users WHERE user_id = ? FOR UPDATE', [customerId])
-    if (customers.length === 0) { await connection.rollback(); return res.status(404).json({ success: false, message: 'Customer not found.' }) }
-    if (!customers[0].status) { await connection.rollback(); return res.status(409).json({ success: false, message: 'Inactive customers cannot add cart items.' }) }
-
-    const [products] = await connection.execute('SELECT product_id, product_name, price, inventory_count, status FROM products WHERE product_id = ? FOR UPDATE', [productId])
-    if (products.length === 0) { await connection.rollback(); return res.status(404).json({ success: false, message: 'Product not found.' }) }
-    const product = products[0]
-    if (!product.status) { await connection.rollback(); return res.status(409).json({ success: false, message: 'Inactive products cannot be added to a cart.' }) }
-
-    const [existing] = await connection.execute('SELECT cart_id, quantity FROM carts WHERE customer_id = ? AND product_id = ? FOR UPDATE', [customerId, productId])
-    const nextQuantity = quantity + (existing.length ? Number(existing[0].quantity) : 0)
-    if (nextQuantity > Number(product.inventory_count)) {
-      await connection.rollback()
-      return res.status(409).json({ success: false, message: `Only ${product.inventory_count} unit(s) of ${product.product_name} are available.` })
-    }
-    const totalPrice = calculateTotal(product.price, nextQuantity)
-    if (totalPrice === null) { await connection.rollback(); return res.status(400).json({ success: false, message: 'The calculated cart total is invalid or too large.' }) }
-
-    let cartId
-    if (existing.length) {
-      cartId = existing[0].cart_id
-      await connection.execute('UPDATE carts SET quantity = ?, total_price = ? WHERE cart_id = ?', [nextQuantity, totalPrice, cartId])
-    } else {
-      const [result] = await connection.execute('INSERT INTO carts (customer_id, product_id, quantity, total_price) VALUES (?, ?, ?, ?)', [customerId, productId, nextQuantity, totalPrice])
-      cartId = result.insertId
-    }
+    const result = await addProductToCart(connection, { customerId, productId, quantity })
     await connection.commit()
-    return res.status(existing.length ? 200 : 201).json({ success: true, message: existing.length ? 'Cart quantity updated successfully.' : 'Product added to cart successfully.', data: { cart_id: cartId, quantity: nextQuantity, total_price: totalPrice } })
+    return res.status(result.updatedExisting ? 200 : 201).json({
+      success: true,
+      message: result.updatedExisting ? 'Cart quantity updated successfully.' : 'Product added to cart successfully.',
+      data: { cart_id: result.cartId, quantity: result.quantity, total_price: result.totalPrice },
+    })
   } catch (error) {
     if (connection) await connection.rollback()
+    if (error instanceof CartOperationError) return res.status(error.status).json({ success: false, message: error.message })
     return sendDatabaseError(res, error)
   } finally { if (connection) connection.release() }
 }
