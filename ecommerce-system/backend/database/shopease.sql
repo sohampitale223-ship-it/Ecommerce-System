@@ -37,6 +37,22 @@ CREATE TABLE IF NOT EXISTS products (
         CHECK (price >= 0)
 );
 
+CREATE TABLE IF NOT EXISTS users (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    phone VARCHAR(15) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    status BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT chk_user_first_name_not_blank CHECK (CHAR_LENGTH(TRIM(first_name)) > 0),
+    CONSTRAINT chk_user_last_name_not_blank CHECK (CHAR_LENGTH(TRIM(last_name)) > 0),
+    CONSTRAINT chk_user_email_not_blank CHECK (CHAR_LENGTH(TRIM(email)) > 0),
+    CONSTRAINT chk_user_phone_not_blank CHECK (CHAR_LENGTH(TRIM(phone)) > 0)
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     order_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     user_id INT NULL,
@@ -48,6 +64,8 @@ CREATE TABLE IF NOT EXISTS orders (
     status BOOLEAN NOT NULL DEFAULT TRUE,
     INDEX idx_orders_user_id (user_id),
     INDEX idx_orders_status_created (order_status, created_at),
+    CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
     CONSTRAINT chk_order_total_nonnegative CHECK (total_amount >= 0),
     CONSTRAINT chk_order_status CHECK (order_status IN ('Pending', 'Shipped', 'Delivered', 'Cancelled')),
     CONSTRAINT chk_shipping_address_not_blank CHECK (CHAR_LENGTH(TRIM(shipping_address)) > 0)
