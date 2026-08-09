@@ -54,6 +54,10 @@ body {
   white-space: nowrap;
 }
 
+.payment-table th {
+  white-space: nowrap;
+}
+
 .order-address {
   min-width: 220px;
   max-width: 360px;

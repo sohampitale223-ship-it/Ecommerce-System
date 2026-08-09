@@ -84,3 +84,34 @@ CREATE TABLE IF NOT EXISTS order_items (
     CONSTRAINT chk_order_item_quantity_positive CHECK (quantity > 0),
     CONSTRAINT chk_order_item_prices_nonnegative CHECK (unit_price >= 0 AND subtotal >= 0)
 );
+
+CREATE TABLE IF NOT EXISTS payments (
+    payment_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    order_id INT UNSIGNED NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    payment_status VARCHAR(50) NOT NULL DEFAULT 'Paid',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_payments_order_id (order_id),
+    INDEX idx_payments_status (payment_status),
+    CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(order_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT chk_payment_amount_positive CHECK (amount > 0),
+    CONSTRAINT chk_payment_method CHECK (payment_method IN ('Card', 'PayPal', 'Bank Transfer')),
+    CONSTRAINT chk_payment_status CHECK (payment_status IN ('Paid', 'Failed', 'Refunded'))
+);
+
+CREATE TABLE IF NOT EXISTS payment_status_history (
+    history_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    payment_id INT UNSIGNED NOT NULL,
+    previous_status VARCHAR(50) NULL,
+    new_status VARCHAR(50) NOT NULL,
+    reason VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_payment_history_payment (payment_id),
+    CONSTRAINT fk_payment_history_payment FOREIGN KEY (payment_id) REFERENCES payments(payment_id)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT chk_payment_history_previous CHECK (previous_status IS NULL OR previous_status IN ('Paid', 'Failed', 'Refunded')),
+    CONSTRAINT chk_payment_history_new CHECK (new_status IN ('Paid', 'Failed', 'Refunded'))
+);

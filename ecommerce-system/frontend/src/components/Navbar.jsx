@@ -27,6 +27,7 @@ function Navbar() {
             <NavLink className={linkClass} to="/products">Products</NavLink>
             <NavLink className={linkClass} to="/orders">Orders</NavLink>
             <NavLink className={linkClass} to="/customers">Customers</NavLink>
+            <NavLink className={linkClass} to="/payments">Payments</NavLink>
             <NavLink className={linkClass} to="/login">Login</NavLink>
             <NavLink className={linkClass} to="/register">Register</NavLink>
           </div>
